@@ -18,16 +18,18 @@ pipeline {
         stage('Deploy Backend') {
             steps {
                 sh '''
-                    echo "🚀 Syncing backend..."
+                    echo "🚀 Deploying backend WITHOUT touching node_modules..."
 
-                    # Do NOT use --delete (it destroys node_modules on server)
-                    rsync -avz backend/ $APP_SERVER:$BACKEND_PATH/
+                    # Sync everything EXCEPT node_modules
+                    rsync -avz \
+                        --exclude=node_modules \
+                        --exclude=.env \
+                        backend/ $APP_SERVER:$BACKEND_PATH/
 
-                    echo "📦 Installing backend dependencies..."
+                    echo "📦 Running npm install on server..."
                     ssh -o StrictHostKeyChecking=no $APP_SERVER "
                         cd $BACKEND_PATH &&
-                        npm install --force &&
-                        sudo systemctl daemon-reload &&
+                        npm install --legacy-peer-deps &&
                         sudo systemctl restart ems-backend
                     "
                 '''
@@ -38,7 +40,10 @@ pipeline {
             steps {
                 sh '''
                     echo "🧩 Syncing frontend..."
-                    rsync -avz frontend/ $APP_SERVER:$FRONTEND_PATH/
+
+                    rsync -avz \
+                        --exclude=node_modules \
+                        frontend/ $APP_SERVER:$FRONTEND_PATH/
 
                     echo "🌐 Restarting Nginx..."
                     ssh -o StrictHostKeyChecking=no $APP_SERVER "sudo systemctl reload nginx"
@@ -64,11 +69,7 @@ pipeline {
     }
 
     post {
-        success {
-            echo "🎉 Deployment SUCCESS!"
-        }
-        failure {
-            echo "⚠ Deployment FAILED! Check logs."
-        }
+        success { echo "🎉 Deployment SUCCESS!" }
+        failure { echo "⚠ Deployment FAILED! Check logs." }
     }
 }
