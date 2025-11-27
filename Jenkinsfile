@@ -20,16 +20,15 @@ pipeline {
                 sh '''
                     echo "🚀 Deploying backend..."
 
-                    # Copy backend files (WITHOUT deleting important folders)
-                    rsync -avz backend/ $APP_SERVER:$BACKEND_PATH/
+                    # Sync backend code (delete old files)
+                    rsync -avz --delete backend/ $APP_SERVER:$BACKEND_PATH/
 
-                    echo "📦 Installing backend dependencies on server..."
-
+                    # Clean and reinstall dependencies on server
                     ssh -o StrictHostKeyChecking=no $APP_SERVER "
                         cd $BACKEND_PATH &&
-                        rm -rf node_modules &&              # Clean reinstall
-                        npm install --production &&        # Install express/mysql2/cors
-                        sudo systemctl restart ems-backend # Restart service
+                        rm -rf node_modules &&
+                        npm install &&
+                        sudo systemctl restart ems-backend
                     "
                 '''
             }
@@ -41,10 +40,7 @@ pipeline {
                     echo "🧩 Deploying frontend..."
 
                     rsync -avz --delete frontend/ $APP_SERVER:$FRONTEND_PATH/
-
-                    ssh -o StrictHostKeyChecking=no $APP_SERVER "
-                        sudo systemctl reload nginx
-                    "
+                    ssh -o StrictHostKeyChecking=no $APP_SERVER "sudo systemctl reload nginx"
                 '''
             }
         }
@@ -54,12 +50,11 @@ pipeline {
                 sh '''
                     echo "🔍 Performing health check..."
                     STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://192.168.152.129)
-
                     if [ "$STATUS" != "200" ]; then
-                        echo "❌ Healthcheck FAILED — Status: $STATUS"
+                        echo "❌ Healthcheck failed! Status: $STATUS"
                         exit 1
                     else
-                        echo "✔ Healthcheck PASSED!"
+                        echo "✔ Healthcheck passed!"
                     fi
                 '''
             }
@@ -67,11 +62,7 @@ pipeline {
     }
 
     post {
-        success {
-            echo "🎉 Application Deployment SUCCESS!"
-        }
-        failure {
-            echo "⚠ Deployment FAILED — Check Logs"
-        }
+        success { echo "🎉 Application Deployment SUCCESS!" }
+        failure { echo "⚠ Deployment FAILED — Check Logs" }
     }
 }
