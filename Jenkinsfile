@@ -19,13 +19,14 @@ pipeline {
             steps {
                 sh '''
                     echo "🚀 Syncing backend..."
-                    rsync -avz --delete backend/ $APP_SERVER:$BACKEND_PATH/
+
+                    # Do NOT use --delete (it destroys node_modules on server)
+                    rsync -avz backend/ $APP_SERVER:$BACKEND_PATH/
 
                     echo "📦 Installing backend dependencies..."
                     ssh -o StrictHostKeyChecking=no $APP_SERVER "
-                        cd /opt/ems-app/backend &&
-                        rm -rf node_modules &&
-                        npm install --omit=dev &&
+                        cd $BACKEND_PATH &&
+                        npm install --force &&
                         sudo systemctl daemon-reload &&
                         sudo systemctl restart ems-backend
                     "
@@ -37,7 +38,9 @@ pipeline {
             steps {
                 sh '''
                     echo "🧩 Syncing frontend..."
-                    rsync -avz --delete frontend/ $APP_SERVER:$FRONTEND_PATH/
+                    rsync -avz frontend/ $APP_SERVER:$FRONTEND_PATH/
+
+                    echo "🌐 Restarting Nginx..."
                     ssh -o StrictHostKeyChecking=no $APP_SERVER "sudo systemctl reload nginx"
                 '''
             }
@@ -48,8 +51,9 @@ pipeline {
                 sh '''
                     echo "🔍 Checking application..."
                     STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://192.168.152.129)
+
                     if [ "$STATUS" != "200" ]; then
-                        echo "❌ Healthcheck failed!"
+                        echo "❌ Healthcheck failed! HTTP $STATUS"
                         exit 1
                     else
                         echo "✔ Healthcheck passed!"
@@ -60,7 +64,11 @@ pipeline {
     }
 
     post {
-        success { echo "🎉 Deployment SUCCESS!" }
-        failure { echo "⚠ Deployment FAILED! Check logs." }
+        success {
+            echo "🎉 Deployment SUCCESS!"
+        }
+        failure {
+            echo "⚠ Deployment FAILED! Check logs."
+        }
     }
 }
