@@ -20,15 +20,16 @@ pipeline {
                 sh '''
                     echo "🚀 Deploying backend..."
 
-                    # Sync backend files
-                    rsync -avz --delete backend/ $APP_SERVER:$BACKEND_PATH/
+                    # Copy backend files (WITHOUT deleting important folders)
+                    rsync -avz backend/ $APP_SERVER:$BACKEND_PATH/
 
                     echo "📦 Installing backend dependencies on server..."
 
                     ssh -o StrictHostKeyChecking=no $APP_SERVER "
                         cd $BACKEND_PATH &&
-                        npm install --production &&
-                        sudo systemctl restart ems-backend
+                        rm -rf node_modules &&              # Clean reinstall
+                        npm install --production &&        # Install express/mysql2/cors
+                        sudo systemctl restart ems-backend # Restart service
                     "
                 '''
             }
@@ -38,8 +39,12 @@ pipeline {
             steps {
                 sh '''
                     echo "🧩 Deploying frontend..."
+
                     rsync -avz --delete frontend/ $APP_SERVER:$FRONTEND_PATH/
-                    ssh -o StrictHostKeyChecking=no $APP_SERVER "sudo systemctl reload nginx"
+
+                    ssh -o StrictHostKeyChecking=no $APP_SERVER "
+                        sudo systemctl reload nginx
+                    "
                 '''
             }
         }
@@ -51,10 +56,10 @@ pipeline {
                     STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://192.168.152.129)
 
                     if [ "$STATUS" != "200" ]; then
-                        echo "❌ Healthcheck failed! Status: $STATUS"
+                        echo "❌ Healthcheck FAILED — Status: $STATUS"
                         exit 1
                     else
-                        echo "✔ Healthcheck passed!"
+                        echo "✔ Healthcheck PASSED!"
                     fi
                 '''
             }
