@@ -20,16 +20,20 @@ pipeline {
                 sh '''
                     echo "🚀 Deploying backend..."
 
-                    # Sync backend code (delete old files)
+                    # Copy backend files
                     rsync -avz --delete backend/ $APP_SERVER:$BACKEND_PATH/
 
-                    # Clean and reinstall dependencies on server
+                    echo "🧹 Cleaning old node_modules..."
+                    ssh -o StrictHostKeyChecking=no $APP_SERVER "rm -rf $BACKEND_PATH/node_modules"
+
+                    echo "📦 Installing backend dependencies..."
                     ssh -o StrictHostKeyChecking=no $APP_SERVER "
                         cd $BACKEND_PATH &&
-                        rm -rf node_modules &&
-                        npm install &&
-                        sudo systemctl restart ems-backend
+                        npm install --omit=dev
                     "
+
+                    echo "🔄 Restarting backend service..."
+                    ssh -o StrictHostKeyChecking=no $APP_SERVER "sudo systemctl restart ems-backend"
                 '''
             }
         }
@@ -38,7 +42,6 @@ pipeline {
             steps {
                 sh '''
                     echo "🧩 Deploying frontend..."
-
                     rsync -avz --delete frontend/ $APP_SERVER:$FRONTEND_PATH/
                     ssh -o StrictHostKeyChecking=no $APP_SERVER "sudo systemctl reload nginx"
                 '''
@@ -62,7 +65,11 @@ pipeline {
     }
 
     post {
-        success { echo "🎉 Application Deployment SUCCESS!" }
-        failure { echo "⚠ Deployment FAILED — Check Logs" }
+        success {
+            echo "🎉 Deployment SUCCESS!"
+        }
+        failure {
+            echo "⚠ Deployment FAILED — Check Logs"
+        }
     }
 }
