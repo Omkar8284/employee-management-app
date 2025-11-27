@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Employee Management</title>
+</head>
+
+<body>
+    <h1>Add Employee</h1>
+
+    <form id="empForm">
+        <label>Name:</label>
+        <input type="text" id="name" required><br><br>
+
+        <label>Role:</label>
+        <input type="text" id="role" required><br><br>
+
+        <button type="submit">Add Employee</button>
+    </form>
+
+    <h2>Employee List</h2>
+    <div id="list"></div>
+
+<script>
+// API Base URL
+const API = "http://192.168.152.129:3001";
+
+// Handle Form Submission
+document.getElementById("empForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const data = {
+        name: document.getElementById("name").value,
+        role: document.getElementById("role").value
+    };
+
+    await fetch(`${API}/employee`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+    });
+
+    loadEmployees();
+});
+
+// Load existing employees
+async function loadEmployees() {
+    const res = await fetch(`${API}/employees`);
+    const employees = await res.json();
+
+    document.getElementById("list").innerHTML =
+        employees.map(emp => `<p>${emp.id}. ${emp.name} — ${emp.role}</p>`).join("");
+}
+
+// Load on page start
+loadEmployees();
+</script>
+
+</body>
+</html>
