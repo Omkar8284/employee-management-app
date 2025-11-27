@@ -18,9 +18,9 @@ pipeline {
         stage('Deploy Backend') {
             steps {
                 sh '''
-                    echo "Deploying backend..."
-                    rsync -avz backend/ $APP_SERVER:$BACKEND_PATH/
-                    ssh $APP_SERVER "sudo systemctl restart ems-backend"
+                    echo "🚀 Deploying backend..."
+                    rsync -avz --delete backend/ $APP_SERVER:$BACKEND_PATH/
+                    ssh -o StrictHostKeyChecking=no $APP_SERVER "sudo systemctl restart ems-backend"
                 '''
             }
         }
@@ -28,9 +28,9 @@ pipeline {
         stage('Deploy Frontend') {
             steps {
                 sh '''
-                    echo "Deploying frontend..."
-                    rsync -avz frontend/ $APP_SERVER:$FRONTEND_PATH/
-                    ssh $APP_SERVER "sudo systemctl reload nginx"
+                    echo "🧩 Deploying frontend..."
+                    rsync -avz --delete frontend/ $APP_SERVER:$FRONTEND_PATH/
+                    ssh -o StrictHostKeyChecking=no $APP_SERVER "sudo systemctl reload nginx"
                 '''
             }
         }
@@ -38,10 +38,13 @@ pipeline {
         stage('Health Check') {
             steps {
                 sh '''
+                    echo "🔍 Performing health check..."
                     STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://192.168.152.129)
                     if [ "$STATUS" != "200" ]; then
-                        echo "Healthcheck failed!"
+                        echo "❌ Healthcheck failed! Status: $STATUS"
                         exit 1
+                    else
+                        echo "✔ Healthcheck passed!"
                     fi
                 '''
             }
@@ -49,7 +52,11 @@ pipeline {
     }
 
     post {
-        success { echo "Deployment SUCCESS" }
-        failure { echo "Deployment FAILED" }
+        success {
+            echo "🎉 Application Deployment SUCCESS!"
+        }
+        failure {
+            echo "⚠ Deployment FAILED — Check Logs"
+        }
     }
 }
