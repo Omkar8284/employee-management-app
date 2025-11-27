@@ -18,22 +18,17 @@ pipeline {
         stage('Deploy Backend') {
             steps {
                 sh '''
-                    echo "🚀 Deploying backend..."
-
-                    # Copy backend files
+                    echo "🚀 Syncing backend..."
                     rsync -avz --delete backend/ $APP_SERVER:$BACKEND_PATH/
-
-                    echo "🧹 Cleaning old node_modules..."
-                    ssh -o StrictHostKeyChecking=no $APP_SERVER "rm -rf $BACKEND_PATH/node_modules"
 
                     echo "📦 Installing backend dependencies..."
                     ssh -o StrictHostKeyChecking=no $APP_SERVER "
-                        cd $BACKEND_PATH &&
-                        npm install --omit=dev
+                        cd /opt/ems-app/backend &&
+                        rm -rf node_modules &&
+                        npm install --omit=dev &&
+                        sudo systemctl daemon-reload &&
+                        sudo systemctl restart ems-backend
                     "
-
-                    echo "🔄 Restarting backend service..."
-                    ssh -o StrictHostKeyChecking=no $APP_SERVER "sudo systemctl restart ems-backend"
                 '''
             }
         }
@@ -41,7 +36,7 @@ pipeline {
         stage('Deploy Frontend') {
             steps {
                 sh '''
-                    echo "🧩 Deploying frontend..."
+                    echo "🧩 Syncing frontend..."
                     rsync -avz --delete frontend/ $APP_SERVER:$FRONTEND_PATH/
                     ssh -o StrictHostKeyChecking=no $APP_SERVER "sudo systemctl reload nginx"
                 '''
@@ -51,10 +46,10 @@ pipeline {
         stage('Health Check') {
             steps {
                 sh '''
-                    echo "🔍 Performing health check..."
+                    echo "🔍 Checking application..."
                     STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://192.168.152.129)
                     if [ "$STATUS" != "200" ]; then
-                        echo "❌ Healthcheck failed! Status: $STATUS"
+                        echo "❌ Healthcheck failed!"
                         exit 1
                     else
                         echo "✔ Healthcheck passed!"
@@ -65,11 +60,7 @@ pipeline {
     }
 
     post {
-        success {
-            echo "🎉 Deployment SUCCESS!"
-        }
-        failure {
-            echo "⚠ Deployment FAILED — Check Logs"
-        }
+        success { echo "🎉 Deployment SUCCESS!" }
+        failure { echo "⚠ Deployment FAILED! Check logs." }
     }
 }
