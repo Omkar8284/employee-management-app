@@ -19,8 +19,17 @@ pipeline {
             steps {
                 sh '''
                     echo "🚀 Deploying backend..."
+
+                    # Sync backend files
                     rsync -avz --delete backend/ $APP_SERVER:$BACKEND_PATH/
-                    ssh -o StrictHostKeyChecking=no $APP_SERVER "sudo systemctl restart ems-backend"
+
+                    echo "📦 Installing backend dependencies on server..."
+
+                    ssh -o StrictHostKeyChecking=no $APP_SERVER "
+                        cd $BACKEND_PATH &&
+                        npm install --production &&
+                        sudo systemctl restart ems-backend
+                    "
                 '''
             }
         }
@@ -40,6 +49,7 @@ pipeline {
                 sh '''
                     echo "🔍 Performing health check..."
                     STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://192.168.152.129)
+
                     if [ "$STATUS" != "200" ]; then
                         echo "❌ Healthcheck failed! Status: $STATUS"
                         exit 1
